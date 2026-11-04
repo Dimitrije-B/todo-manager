@@ -40,19 +40,7 @@ Kostenlose Supabase-Projekte werden nach längerer Zeit ohne Zugriff pausiert. B
 
 ## Bedienung in Kürze
 
-**Schnellerfassung** oben in jeder Liste versteht Kurzzeichen:
-
-```
-Bot-Schutz prüfen #preise/preisspion !1 @morgen +scraper https://beispiel.de
-```
-
-| Zeichen | Wirkung |
-| --- | --- |
-| `#bereich` oder `#bereich/unterbereich` | ordnet zu; ohne Angabe landet die Aufgabe im aktuellen Bereich bzw. im Eingang |
-| `!1` bis `!4` | Priorität |
-| `@heute`, `@morgen`, `@fr`, `@nw`, `@+3`, `@14.10.` | Fälligkeit |
-| `+tag` | Tag |
-| URL oder `\\server\pfad` | wird als Link angelegt |
+**Neue Aufgabe:** Der Knopf oben rechts (oder Taste `N`) öffnet einen Dialog, in dem sich alles auf einmal eintragen lässt: Titel, Status, Bereich, Priorität, Fälligkeit, Wiedervorlage, Tags, Beschreibung, Checkliste, Unteraufgaben, Links und ein erster Vermerk. In Checkliste, Unteraufgaben, Links und Tags legt Enter den Eintrag an, `Strg` + `Enter` legt die Aufgabe an. Mit „Danach weitere Aufgabe anlegen“ bleibt der Dialog für die nächste Aufgabe offen. Bereich und Fälligkeit sind passend zur gerade offenen Ansicht vorbelegt.
 
 **Stati:** Backlog, Geplant, In Arbeit, Test, Wartet, Blockiert, Erledigt, Verworfen. „Wartet“ fragt nach dem Grund und einer Wiedervorlage, „Blockiert“ und „Verworfen“ nach einem Grund. Die Angabe landet als Vermerk an der Aufgabe. Stati lassen sich unter Einstellungen umbenennen, umfärben, ergänzen und sortieren.
 
@@ -77,7 +65,7 @@ Geänderte Dateien im Repo ersetzen. Die App holt beim nächsten Öffnen mit Int
 | `js/app.js` | Oberfläche |
 | `js/store.js` | Datenmodell, Speichern im Browser, Import und Export |
 | `js/sync.js` | Abgleich mit Supabase |
-| `js/util.js` | Datum, Links, Schnellerfassung |
+| `js/util.js` | Datum, Links, Hilfsfunktionen |
 | `js/config.js` | Supabase-Zugang, leer = nur lokal |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline-Betrieb und Installation als App |
 | `vendor/vue.global.prod.js` | Vue 3.5 (MIT-Lizenz), lokal statt aus dem Netz |

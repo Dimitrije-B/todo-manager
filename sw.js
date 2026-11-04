@@ -1,6 +1,6 @@
 /* Service Worker: App offline verfügbar machen.
    Strategie: erst Netz (damit Updates sofort ankommen), bei fehlender Verbindung aus dem Cache. */
-const CACHE = 'todo-manager-v2';
+const CACHE = 'todo-manager-v3';
 const ASSETS = [
   './',
   './index.html',

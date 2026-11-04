@@ -140,34 +140,6 @@
     return out;
   };
 
-  /* ---------- Schnellerfassung ----------
-     "Bot-Schutz prüfen #preise/preisspion !1 @morgen +scraper https://…" */
-  U.parseQuick = (text, findArea) => {
-    const out = { title: '', areaId: null, areaToken: null, priority: null, due: null, tags: [], links: [] };
-    let s = ' ' + String(text || '') + ' ';
-    s = s.replace(/(https?:\/\/\S+|\\\\\S+)/g, m => { out.links.push(U.makeLink(m)); return ' '; });
-    s = s.replace(/\s#([^\s#!@+]+)/g, (m, tok) => {
-      const id = findArea(tok);
-      if (id) { out.areaId = id; return ' '; }
-      out.areaToken = tok;
-      return m;
-    });
-    s = s.replace(/\s!([1-4])(?=\s)/g, (m, p) => { out.priority = Number(p); return ' '; });
-    s = s.replace(/\s@(\S+)/g, (m, w) => {
-      const d = U.parseDateWord(w);
-      if (d) { out.due = d; return ' '; }
-      return m;
-    });
-    s = s.replace(/\s\+([\p{L}\p{N}_-]+)/gu, (m, tg) => {
-      const tag = tg.toLowerCase();
-      if (!out.tags.includes(tag)) out.tags.push(tag);
-      return ' ';
-    });
-    out.title = s.replace(/\s+/g, ' ').trim();
-    if (!out.title && out.links.length) out.title = U.linkShort(out.links[0]);
-    return out;
-  };
-
   /* ---------- Sonstiges ---------- */
   U.debounce = (fn, ms) => {
     let t = null;

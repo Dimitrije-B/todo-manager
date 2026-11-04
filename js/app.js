@@ -89,6 +89,7 @@
     menu: null,
     prompt: null,
     areaDialog: null,
+    newTask: null,
     toast: null
   });
   if (ui.view === 'area' && !S.area(ui.areaId)) { ui.view = 'today'; ui.areaId = null; }
@@ -459,56 +460,193 @@
 </div>`
   };
 
-  const QuickAdd = {
-    data() { return { text: '', focus: false }; },
+  /* ---------- Dialog „Neue Aufgabe“: alle Angaben auf einmal ---------- */
+  let keepOpenSaved = false;
+  try { keepOpenSaved = localStorage.getItem('tm_keep_open') === '1'; } catch (e) { /* egal */ }
+  function defaultNewArea() {
+    if (ui.view === 'area' && S.area(ui.areaId) && !S.isAreaArchived(ui.areaId)) return ui.areaId;
+    if (ui.view === 'open' && ui.areaFilter.length === 1 && S.area(ui.areaFilter[0])) return ui.areaFilter[0];
+    return 'inbox';
+  }
+  function emptyDraft(keep) {
+    return Object.assign({
+      title: '', description: '', statusId: S.openStatusId(), areaId: defaultNewArea(), priority: null,
+      due: ui.view === 'today' ? today.value : null, followUp: null, tags: [], checks: [], subs: [], links: [],
+      note: '', reason: '', flagged: ui.view === 'flagged',
+      tagInput: '', checkInput: '', subInput: '', linkInput: '', error: ''
+    }, keep || {});
+  }
+  function openNewTask() { ui.menu = null; ui.newTask = emptyDraft(); }
+  function draftDirty(d) {
+    return !!(d && (d.title.trim() || d.description.trim() || d.note.trim() || d.reason.trim() || d.checks.length || d.subs.length ||
+      d.links.length || d.tags.length || d.checkInput.trim() || d.subInput.trim() || d.linkInput.trim()));
+  }
+  /* Schließen fragt nach, wenn schon etwas eingetragen ist */
+  function closeNewTask() {
+    if (draftDirty(ui.newTask) && !confirm('Die Aufgabe ist noch nicht angelegt. Eingaben verwerfen?')) return;
+    ui.newTask = null;
+  }
+
+  const NewTaskDialog = {
+    data() { return { keepOpen: keepOpenSaved }; },
     computed: {
-      defaultArea() {
-        if (ui.view === 'area' && S.area(ui.areaId)) return ui.areaId;
-        if (ui.view === 'open' && ui.areaFilter.length === 1 && S.area(ui.areaFilter[0])) return ui.areaFilter[0];
-        return 'inbox';
-      },
-      parsed() { return this.text.trim() ? U.parseQuick(this.text, S.findArea) : null; },
-      targetArea() { return (this.parsed && this.parsed.areaId) || this.defaultArea; },
-      targetColor() { return (S.area(this.targetArea) || {}).color || 'var(--faint)'; },
-      implicitDue() { return ui.view === 'today' && this.parsed && !this.parsed.due ? today.value : null; }
+      d() { return ui.newTask; },
+      statuses() { return S.statusList(); },
+      st() { return S.status(this.d.statusId); },
+      waiting() { return this.st.require === 'waiting'; },
+      areaOptions() { return TaskDetail.computed.areaOptions(); },
+      areaColor() { return (S.area(this.d.areaId) || {}).color || 'var(--faint)'; },
+      tagSuggestions() { return S.allTags().filter(t => !this.d.tags.includes(t)); },
+      checksDone() { return this.d.checks.filter(c => c.done).length; }
     },
+    watch: { keepOpen(v) { keepOpenSaved = v; try { localStorage.setItem('tm_keep_open', v ? '1' : '0'); } catch (e) { /* egal */ } } },
+    mounted() { this.focusTitle(); },
     methods: {
-      submit() {
-        const p = this.parsed;
-        if (!p || !p.title) return;
+      focusTitle() { nextTick(() => this.$refs.title && this.$refs.title.focus()); },
+      setPrio(p) { this.d.priority = this.d.priority === p ? null : p; },
+      quickDate(field, n) { this.d[field] = U.addDays(U.todayISO(), n); },
+      addTag() {
+        const v = this.d.tagInput.trim().replace(/^\+/, '').toLowerCase().replace(/\s+/g, '-');
+        if (v && !this.d.tags.includes(v)) this.d.tags.push(v);
+        this.d.tagInput = '';
+      },
+      addCheck() { const v = this.d.checkInput.trim(); if (v) this.d.checks.push({ text: v, done: false }); this.d.checkInput = ''; },
+      addSub() { const v = this.d.subInput.trim(); if (v) this.d.subs.push(v); this.d.subInput = ''; },
+      addLink() {
+        const v = this.d.linkInput.trim();
+        if (v && !this.d.links.some(l => l.target === v)) this.d.links.push(U.makeLink(v));
+        this.d.linkInput = '';
+      },
+      close() { closeNewTask(); },
+      save() {
+        const d = this.d;
+        /* Begonnene Eingaben nicht verlieren */
+        this.addTag(); this.addCheck(); this.addSub(); this.addLink();
+        const title = d.title.trim();
+        const st = this.st;
+        if (!title) { d.error = 'title'; this.focusTitle(); return; }
+        if (st.require && !d.reason.trim()) { d.error = 'reason'; nextTick(() => this.$refs.reason && this.$refs.reason.focus()); return; }
+        if (this.waiting && !d.followUp) { d.error = 'followUp'; return; }
         const t = S.createTask({
-          title: p.title, areaId: this.targetArea, priority: p.priority, due: p.due || this.implicitDue,
-          tags: p.tags, links: p.links, flagged: ui.view === 'flagged'
+          title, description: d.description.trim(), areaId: d.areaId,
+          statusId: st.require ? S.openStatusId() : st.id,
+          priority: d.priority, due: d.due || null, followUp: d.followUp || null, tags: d.tags.slice(),
+          links: d.links.map(l => Object.assign({}, l)), flagged: d.flagged,
+          checklist: d.checks.map(c => ({ id: U.uid(), text: c.text, done: c.done })),
+          createdVia: 'Neue Aufgabe in ' + S.pathLabel(d.areaId)
         });
-        this.text = '';
+        if (st.require) S.setStatus(t.id, st.id, { note: d.reason, followUp: this.waiting ? d.followUp : undefined });
+        d.subs.forEach(text => S.createTask({ title: text, areaId: t.areaId, parentId: t.id }));
+        if (d.note.trim()) S.addNote('task', t.id, d.note);
         const here = ui.view !== 'area' || [ui.areaId].concat(ui.includeSub ? S.descendants(ui.areaId) : []).includes(t.areaId);
-        toast(here ? 'Aufgabe angelegt' : `Angelegt in ${S.pathLabel(t.areaId)}`, {
+        toast(here ? `„${U.short(t.title, 40)}“ angelegt` : `Angelegt in ${S.pathLabel(t.areaId)}`, {
           label: 'Öffnen',
-          fn: () => { if (!here) go('area', t.areaId); selectTask(t.id); }
+          fn: () => { ui.newTask = null; if (!here) go('area', t.areaId); selectTask(t.id); }
         });
+        if (this.keepOpen) {
+          ui.newTask = emptyDraft({ areaId: d.areaId, statusId: st.require ? S.openStatusId() : st.id });
+          this.focusTitle();
+        } else ui.newTask = null;
       }
     },
     template: `
-<div class="quick-wrap">
-  <form class="quick" @submit.prevent="submit">
-    <icon name="plus" class="quick-ico"/>
-    <input id="quick-input" v-model="text" @focus="focus = true" @blur="focus = false" placeholder="Neue Aufgabe" autocomplete="off" enterkeyhint="done" aria-label="Neue Aufgabe">
-    <button class="btn primary sm" :disabled="!parsed || !parsed.title">Anlegen</button>
-  </form>
-  <div v-if="parsed" class="preview">
-    <span class="chip"><span class="area-dot" :style="{ background: targetColor }"></span>{{ S.pathLabel(targetArea) }}</span>
-    <span v-if="parsed.areaToken && !parsed.areaId" class="chip warn">#{{ parsed.areaToken }} nicht gefunden</span>
-    <span v-if="parsed.priority" class="chip"><span :class="['prio', 'p' + parsed.priority]">P{{ parsed.priority }}</span></span>
-    <span v-if="parsed.due || implicitDue" class="chip"><icon name="calendar" :size="13"/>{{ U.fmtDate(parsed.due || implicitDue) }}</span>
-    <span v-for="tg in parsed.tags" :key="tg" class="chip tag">+{{ tg }}</span>
-    <span v-for="l in parsed.links" :key="l.id" class="chip"><icon name="link" :size="13"/>{{ U.linkShort(l) }}</span>
-  </div>
-  <div v-else-if="focus" class="quick-hint">
-    <span><code>#bereich</code> zuordnen</span>
-    <span><code>!1</code> bis <code>!4</code> Priorität</span>
-    <span><code>@morgen</code> <code>@fr</code> <code>@14.10.</code> fällig</span>
-    <span><code>+tag</code> Tag</span>
-    <span>URL oder Netzwerkpfad wird zum Link</span>
+<div class="modal-back nt-back" @mousedown.self="close">
+  <div class="nt" role="dialog" aria-modal="true" aria-labelledby="nt-head" @keydown.ctrl.enter.prevent="save" @keydown.meta.enter.prevent="save">
+    <header class="nt-top">
+      <button class="icon-btn only-mobile" @click="close" aria-label="Schließen"><icon name="x"/></button>
+      <span id="nt-head" class="nt-label">Neue Aufgabe</span>
+      <span class="nt-in hide-sm">in <span class="area-dot" :style="{ background: areaColor }"></span>{{ S.pathLabel(d.areaId) }}</span>
+      <span class="spacer"></span>
+      <button :class="['icon-btn', 'star', { on: d.flagged }]" @click="d.flagged = !d.flagged" :title="d.flagged ? 'Markierung entfernen' : 'Markieren'" :aria-label="d.flagged ? 'Markierung entfernen' : 'Markieren'" :aria-pressed="String(d.flagged)"><icon name="star"/></button>
+      <button class="icon-btn only-desktop" @click="close" title="Schließen (Esc)" aria-label="Schließen"><icon name="x"/></button>
+    </header>
+    <div class="nt-head">
+      <input ref="title" class="nt-title" v-model="d.title" @input="d.error = ''" @keydown.enter.exact.prevent="save" placeholder="Was ist zu tun?" aria-label="Titel" autocomplete="off" enterkeyhint="done">
+      <p v-if="d.error === 'title'" class="msg">Bitte gib der Aufgabe einen Titel.</p>
+      <div class="status-pills nt-status" role="radiogroup" aria-label="Status">
+        <button v-for="s in statuses" :key="s.id" type="button" :class="['pill', { on: s.id === st.id }]" :style="{ '--c': s.color }" role="radio" :aria-checked="String(s.id === st.id)" @click="d.statusId = s.id; d.error = ''"><span class="led" :style="{ '--c': s.color }"></span>{{ s.name }}</button>
+      </div>
+      <div v-if="st.require" class="nt-reason">
+        <label class="field"><span>{{ waiting ? 'Worauf oder auf wen wartest du?' : 'Grund für „' + st.name + '“' }}</span>
+          <input ref="reason" class="input" v-model="d.reason" @input="d.error = ''" :placeholder="waiting ? 'z. B. Rückmeldung vom Lieferanten zur Preisliste' : 'z. B. API-Zugang fehlt noch'">
+        </label>
+        <p v-if="d.error === 'reason'" class="msg">Bitte einen Grund angeben, er wird als Vermerk gespeichert.</p>
+        <p v-else-if="waiting" :class="d.error === 'followUp' ? 'msg' : 'hint'">Für „{{ st.name }}“ braucht es eine Wiedervorlage (rechts).</p>
+      </div>
+    </div>
+    <div class="nt-body">
+      <div class="nt-main">
+        <section>
+          <div class="sec-head"><h4>Beschreibung</h4></div>
+          <textarea v-autosize class="desc-box" v-model="d.description" placeholder="Was ist zu tun? Aktueller Stand, Vorgehen, Kontext" aria-label="Beschreibung"></textarea>
+        </section>
+        <section>
+          <div class="sec-head"><h4>Checkliste</h4><span v-if="d.checks.length" class="muted small">{{ checksDone }}/{{ d.checks.length }}</span></div>
+          <ul v-if="d.checks.length" class="check-list">
+            <li v-for="(c, i) in d.checks" :key="i" :class="['check-item', { done: c.done }]">
+              <input type="checkbox" v-model="c.done" :aria-label="c.text">
+              <input class="txt" v-model="c.text" aria-label="Punkt">
+              <button class="icon-btn sm" @click="d.checks.splice(i, 1)" title="Entfernen" aria-label="Punkt entfernen"><icon name="x" :size="14"/></button>
+            </li>
+          </ul>
+          <div class="add-line"><input class="input" v-model="d.checkInput" @keydown.enter.exact.prevent="addCheck" placeholder="Punkt hinzufügen, Enter für den nächsten" aria-label="Punkt hinzufügen"><button class="btn sm" :disabled="!d.checkInput.trim()" @click="addCheck">Hinzufügen</button></div>
+        </section>
+        <section>
+          <div class="sec-head"><h4>Unteraufgaben</h4><span v-if="d.subs.length" class="muted small">{{ d.subs.length }}</span></div>
+          <ul v-if="d.subs.length" class="check-list">
+            <li v-for="(u, i) in d.subs" :key="i" class="check-item">
+              <span class="nt-sub-dot" aria-hidden="true"></span>
+              <input class="txt" v-model="d.subs[i]" aria-label="Unteraufgabe">
+              <button class="icon-btn sm" @click="d.subs.splice(i, 1)" title="Entfernen" aria-label="Unteraufgabe entfernen"><icon name="x" :size="14"/></button>
+            </li>
+          </ul>
+          <div class="add-line"><input class="input" v-model="d.subInput" @keydown.enter.exact.prevent="addSub" placeholder="Unteraufgabe anlegen" aria-label="Unteraufgabe anlegen"><button class="btn sm" :disabled="!d.subInput.trim()" @click="addSub">Anlegen</button></div>
+        </section>
+        <section>
+          <div class="sec-head"><h4>Links</h4></div>
+          <ul v-if="d.links.length" class="link-list nt-links">
+            <li v-for="(l, i) in d.links" :key="l.id" class="nt-link">
+              <select class="select-sm" v-model="l.kind" aria-label="Typ"><option v-for="k in U.LINK_KINDS" :key="k.id" :value="k.id">{{ k.label }}</option></select>
+              <span class="link-target" :title="l.target">{{ l.target }}</span>
+              <button class="icon-btn sm" @click="d.links.splice(i, 1)" title="Entfernen" aria-label="Link entfernen"><icon name="x" :size="14"/></button>
+            </li>
+          </ul>
+          <div class="add-line"><input class="input" v-model="d.linkInput" @keydown.enter.exact.prevent="addLink" placeholder="URL, Netzwerkpfad, Repo oder Server einfügen" aria-label="Link hinzufügen"><button class="btn sm" :disabled="!d.linkInput.trim()" @click="addLink"><icon name="link" :size="14"/>Link</button></div>
+        </section>
+        <section>
+          <div class="sec-head"><h4>Erster Vermerk <span class="muted" style="font-weight: 400">(optional)</span></h4></div>
+          <textarea v-autosize class="input" rows="2" v-model="d.note" placeholder="z. B. Telefonat, Zwischenstand, Entscheidung" aria-label="Vermerk"></textarea>
+        </section>
+      </div>
+      <div class="nt-side">
+        <label class="field"><span>Bereich</span>
+          <select class="input" v-model="d.areaId"><option v-for="o in areaOptions" :key="o.id" :value="o.id">{{ o.label }}</option></select>
+        </label>
+        <div class="field"><span>Priorität</span>
+          <div class="seg prio-seg nt-prio" role="group" aria-label="Priorität"><button v-for="p in [1, 2, 3, 4]" :key="p" type="button" :class="{ on: d.priority === p }" :aria-pressed="String(d.priority === p)" @click="setPrio(p)">P{{ p }}</button></div>
+        </div>
+        <div class="field"><span>Fällig</span>
+          <div class="date-row nt-date"><input type="date" class="input" v-model="d.due" aria-label="Fällig am"><button v-if="d.due" class="icon-btn sm" @click="d.due = null" aria-label="Fälligkeit entfernen"><icon name="x" :size="14"/></button></div>
+          <div class="nt-quick"><button class="btn ghost sm" @click="quickDate('due', 0)">Heute</button><button class="btn ghost sm" @click="quickDate('due', 1)">Morgen</button><button class="btn ghost sm" @click="quickDate('due', 7)">+1 Woche</button></div>
+        </div>
+        <div class="field"><span>Wiedervorlage<template v-if="waiting"> *</template></span>
+          <div class="date-row nt-date"><input type="date" :class="['input', { invalid: d.error === 'followUp' }]" v-model="d.followUp" @change="d.error = ''" aria-label="Wiedervorlage am"><button v-if="d.followUp" class="icon-btn sm" @click="d.followUp = null" aria-label="Wiedervorlage entfernen"><icon name="x" :size="14"/></button></div>
+          <div class="nt-quick"><button class="btn ghost sm" @click="quickDate('followUp', 3); d.error = ''">+3 Tage</button><button class="btn ghost sm" @click="quickDate('followUp', 7); d.error = ''">+1 Woche</button></div>
+        </div>
+        <div class="field"><span>Tags</span>
+          <div v-if="d.tags.length" class="tag-edit"><span v-for="(tg, i) in d.tags" :key="tg" class="chip">+{{ tg }}<button class="chip-x" @click="d.tags.splice(i, 1)" :aria-label="'Tag ' + tg + ' entfernen'"><icon name="x" :size="12"/></button></span></div>
+          <input class="input" v-model="d.tagInput" list="nt-tag-suggestions" placeholder="Tag eingeben, Enter" @keydown.enter.exact.prevent="addTag" aria-label="Tag hinzufügen">
+          <datalist id="nt-tag-suggestions"><option v-for="t in tagSuggestions" :key="t" :value="t"></option></datalist>
+        </div>
+      </div>
+    </div>
+    <footer class="nt-foot">
+      <label class="toggle"><input type="checkbox" v-model="keepOpen">Danach weitere Aufgabe anlegen</label>
+      <span class="spacer"></span>
+      <span class="muted small hide-sm">Strg + Enter legt an</span>
+      <button class="btn ghost hide-sm" @click="close">Abbrechen</button>
+      <button class="btn primary" @click="save">Aufgabe anlegen</button>
+    </footer>
   </div>
 </div>`
   };
@@ -1356,12 +1494,12 @@
         <button :class="{ on: ui.layout === 'list' }" @click="ui.layout = 'list'" title="Liste" :aria-pressed="String(ui.layout === 'list')"><icon name="list" :size="15"/><span class="hide-sm">Liste</span></button>
         <button :class="{ on: ui.layout === 'board' }" @click="ui.layout = 'board'" title="Kanban" :aria-pressed="String(ui.layout === 'board')"><icon name="board" :size="15"/><span class="hide-sm">Kanban</span></button>
       </div>
+      <button v-if="showQuick" class="btn primary new-btn" @click="openNewTask" title="Neue Aufgabe (N)"><icon name="plus" :size="15"/><span class="hide-sm">Neue Aufgabe</span></button>
       <button class="icon-btn theme-btn" @click.stop="toggleDark" :title="isDark ? 'Hellen Modus einschalten' : 'Dunklen Modus einschalten'" :aria-label="isDark ? 'Hellen Modus einschalten' : 'Dunklen Modus einschalten'"><icon :name="isDark ? 'sun' : 'moon'"/></button>
     </header>
     <div :class="['content', { wide: listLike && ui.layout === 'board' }]">
       <area-brief v-if="ui.view === 'area' && currentArea" :area="currentArea"/>
       <header v-else-if="pageHead" class="page-head"><h1>{{ pageHead.title }}</h1><p v-if="pageHead.sub">{{ pageHead.sub }}</p></header>
-      <quick-add v-if="showQuick"/>
       <div v-if="listLike" class="toolbar">
         <label v-if="ui.layout === 'list'" class="toolbar-field">Gruppieren
           <select class="select-sm" v-model="ui.groupBy"><option value="status">nach Status</option><option value="area">nach Bereich</option><option value="none">nicht</option></select>
@@ -1389,6 +1527,7 @@
   <task-detail v-if="selectedTask" :task="selectedTask"/>
   <status-prompt v-if="ui.prompt"/>
   <area-dialog v-if="ui.areaDialog"/>
+  <new-task-dialog v-if="ui.newTask"/>
   <div v-if="ui.toast" class="toast" role="status"><span>{{ ui.toast.text }}</span><button v-if="ui.toast.action" @click.stop="runToast">{{ ui.toast.action.label }}</button></div>
 </div>`
   };
@@ -1447,18 +1586,18 @@
     if (e.key === 'Escape') {
       if (ui.prompt) ui.prompt = null;
       else if (ui.areaDialog) ui.areaDialog = null;
+      else if (ui.newTask) closeNewTask();
       else if (ui.menu) ui.menu = null;
       else if (typing) e.target.blur();
       else if (ui.selectedTaskId) ui.selectedTaskId = null;
       else if (ui.sidebarOpen) ui.sidebarOpen = false;
       return;
     }
-    if (typing || e.ctrlKey || e.metaKey || e.altKey || ui.prompt || ui.areaDialog) return;
+    if (typing || e.ctrlKey || e.metaKey || e.altKey || ui.prompt || ui.areaDialog || ui.newTask) return;
     const k = e.key.toLowerCase();
     const sel = ui.selectedTaskId ? S.task(ui.selectedTaskId) : null;
     if (k === 'n') {
-      const q = document.getElementById('quick-input');
-      if (q) { e.preventDefault(); q.focus(); }
+      if (document.querySelector('.new-btn')) { e.preventDefault(); openNewTask(); }
     } else if (k === '/') {
       e.preventDefault();
       if (innerWidth <= 900) ui.sidebarOpen = true;
@@ -1483,14 +1622,14 @@
 
   /* ---------- Start ---------- */
   const app = createApp(App);
-  Object.assign(app.config.globalProperties, { S, U, Y, ui, go, toggleDone, requestStatus, endDrag, selectTask, toggleDark });
+  Object.assign(app.config.globalProperties, { S, U, Y, ui, go, toggleDone, requestStatus, endDrag, selectTask, toggleDark, openNewTask });
   app.directive('autosize', autosize);
   app.component('icon', Icon);
   app.component('tree-node', TreeNode);
   app.component('task-row', TaskRow);
   app.component('task-list', TaskList);
   app.component('board-view', BoardView);
-  app.component('quick-add', QuickAdd);
+  app.component('new-task-dialog', NewTaskDialog);
   app.component('area-filter', AreaFilter);
   app.component('links-editor', LinksEditor);
   app.component('notes-editor', NotesEditor);
