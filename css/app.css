@@ -177,19 +177,6 @@ button.sync-line:hover { background: var(--sunken); }
 .seg button:hover { color: var(--ink); }
 .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 10%); font-weight: 500; }
 
-/* ---------- Schnellerfassung ---------- */
-.quick-wrap { margin: 14px 0 4px; }
-.quick {
-  display: flex; align-items: center; gap: 8px; padding: 4px 5px 4px 12px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m);
-}
-.quick:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.quick-ico { color: var(--muted); }
-.quick input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; padding: 8px 0; font-size: 15px; }
-.quick-hint { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 4px 0; font-size: 12.5px; color: var(--muted); }
-.quick-hint code { color: var(--ink); }
-.preview { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 2px 0; }
-
 .chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; min-height: 26px;
   border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
@@ -513,6 +500,68 @@ label.btn { cursor: pointer; }
 .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; max-width: 70ch; }
 .modal .hint { margin: 0; font-size: 12.5px; }
 .msg { margin: 4px 0 0; font-size: 13px; color: var(--danger); }
+/* ---------- Dialog „Neue Aufgabe“ ---------- */
+.new-btn { min-height: 32px; padding: 5px 12px; }
+.nt-back { padding: 24px; }
+.nt {
+  width: min(940px, 100%); max-height: min(860px, calc(100dvh - 48px)); display: flex; flex-direction: column;
+  background: var(--surface); border-radius: var(--r-l); box-shadow: var(--shadow); overflow: hidden;
+}
+.nt-top { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0 22px; min-height: 46px; }
+.nt-label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.nt-in { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--faint); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nt-in .area-dot { margin-left: 2px; }
+.nt-head { padding: 0 22px 14px; }
+.nt-title {
+  display: block; width: 100%; border: 0; background: transparent; outline: none; padding: 4px 0;
+  font-size: 23px; font-weight: 600; line-height: 1.3; color: var(--ink);
+}
+.nt-title::placeholder { color: var(--faint); font-weight: 400; }
+[data-design="papier"] .nt-title { font-family: var(--display); font-weight: 400; font-size: 26px; }
+.nt-status { margin-top: 10px; }
+.nt-reason { margin-top: 12px; display: grid; gap: 4px; max-width: 560px; }
+.nt-reason .hint { margin: 0; }
+.nt-body {
+  flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: minmax(0, 1fr) 290px;
+}
+.nt-main { padding: 16px 22px 22px; display: grid; gap: 20px; align-content: start; min-width: 0; }
+.nt-side { padding: 16px 18px 22px; background: var(--surface-2); border-left: 1px solid var(--line); display: grid; gap: 16px; align-content: start; min-width: 0; }
+.nt-side .field > span { font-weight: 500; }
+.nt-prio { width: fit-content; }
+.nt-prio button { min-width: 46px; justify-content: center; }
+.nt-date { grid-template-columns: minmax(0, 1fr) auto; }
+.nt-quick { display: flex; flex-wrap: wrap; gap: 2px; margin-left: -6px; }
+.input.invalid { border-color: var(--danger); box-shadow: 0 0 0 2px var(--danger-soft); }
+.nt-sub-dot { width: 15px; height: 15px; border-radius: 50%; border: 1.8px solid var(--faint); flex: none; }
+.nt-link {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 4px 4px 4px 6px; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--surface-2);
+}
+.nt-links { margin-bottom: 6px; }
+.nt-foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 22px; border-top: 1px solid var(--line); background: var(--surface); }
+@media (max-width: 760px) {
+  .nt-body { grid-template-columns: minmax(0, 1fr); }
+  .nt-side { border-left: 0; border-top: 1px solid var(--line); order: -1; }
+}
+@media (max-width: 640px) {
+  /* Auf dem Handy als Vollbild */
+  .nt-back { padding: 0; place-items: stretch; }
+  .nt { width: 100%; max-height: none; height: 100dvh; border-radius: 0; }
+  .nt-top { padding: calc(6px + env(safe-area-inset-top)) 6px 0 4px; }
+  .nt-head { padding: 0 16px 12px; }
+  .nt-title { font-size: 21px; }
+  .nt-status { flex-wrap: nowrap; overflow-x: auto; margin-left: -16px; margin-right: -16px; padding: 0 16px 2px; }
+  .nt-status .pill { flex: none; min-height: 36px; }
+  .nt-main, .nt-side { padding-left: 16px; padding-right: 16px; }
+  .nt-side { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .nt-side > :first-child, .nt-side > :nth-child(2), .nt-side > :last-child { grid-column: 1 / -1; }
+  .nt-prio { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .nt-prio button { min-height: 38px; }
+  .nt-foot { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .nt-foot .btn.primary { min-height: 44px; flex: 1; max-width: 220px; }
+}
+
 .toast {
   position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 70;
   display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px);
@@ -645,12 +694,10 @@ kbd {
 [data-design="papier"] .task-card { border-color: transparent; box-shadow: 0 1px 2px rgb(60 40 20 / 10%); padding: 11px 8px 11px 12px; }
 [data-design="papier"] .task-card:hover { box-shadow: 0 2px 10px rgb(60 40 20 / 14%); }
 [data-design="papier"] .task-card.selected { box-shadow: 0 0 0 2px var(--accent); }
-[data-design="papier"] .quick { border-color: transparent; box-shadow: 0 1px 2px rgb(60 40 20 / 8%); }
 [data-design="papier"] .prio.p1 { background: #B83A2E; }
 [data-design="papier"] .prio.p2 { background: #C27A1A; }
 [data-design="papier"][data-theme="dark"] .rows,
-[data-design="papier"][data-theme="dark"] .task-card,
-[data-design="papier"][data-theme="dark"] .quick { box-shadow: 0 1px 2px rgb(0 0 0 / 35%); }
+[data-design="papier"][data-theme="dark"] .task-card { box-shadow: 0 1px 2px rgb(0 0 0 / 35%); }
 
 /* =====================================================================
    Design „Fokus“: kontrastreich, dunkle Seitenleiste, violette Akzente
@@ -726,7 +773,6 @@ kbd {
 [data-design="fokus"] .task-card { margin-bottom: 6px; box-shadow: 0 1px 0 var(--line); }
 [data-design="fokus"] .task-card:hover { border-color: var(--accent); }
 [data-design="fokus"] .group-head { text-transform: uppercase; font-size: 11.5px; letter-spacing: 0.06em; }
-[data-design="fokus"] .quick { border-width: 1.5px; }
 [data-design="fokus"] .btn.primary { box-shadow: 0 1px 0 rgb(0 0 0 / 15%), inset 0 1px 0 rgb(255 255 255 / 15%); }
 [data-design="fokus"] .prio.p3 { color: var(--accent); }
 
