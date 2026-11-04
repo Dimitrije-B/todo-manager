@@ -210,6 +210,39 @@ button.chip:hover { border-color: var(--line-strong); }
 .toggle input { accent-color: var(--accent); margin: 0; }
 .select-sm { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-s); padding: 3px 6px; font-size: 13px; color: var(--ink); }
 
+/* Bereichsfilter */
+.area-filter { display: inline-flex; align-items: center; gap: 4px; }
+.filter-btn {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 320px;
+  border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-s);
+  padding: 3px 8px; font-size: 13px; color: var(--muted); min-height: 28px;
+}
+.filter-btn strong { font-weight: 500; color: var(--ink); min-width: 0; }
+.filter-btn:hover { border-color: var(--line-strong); }
+.filter-btn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.filter-btn.on strong { color: var(--accent); }
+.menu.area-menu { left: 0; right: auto; width: 300px; padding: 6px 4px; }
+.area-menu-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 4px 0; border-bottom: 1px solid var(--line); }
+.area-menu-list { max-height: min(60vh, 420px); overflow-y: auto; padding-top: 4px; }
+.area-opt { display: flex; align-items: center; gap: 4px; border-radius: var(--r-s); padding-right: 4px; }
+.area-opt:hover { background: var(--sunken); }
+.area-opt label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; color: var(--ink); font-size: 13.5px; }
+.area-opt input { accent-color: var(--accent); margin: 0; flex: none; }
+.area-opt.implied label { color: var(--muted); cursor: default; }
+.area-opt .count { margin-left: auto; padding-left: 6px; }
+.only-btn { border: 0; background: transparent; color: var(--accent); font-size: 12px; padding: 2px 6px; border-radius: 4px; opacity: 0; }
+.area-opt:hover .only-btn, .only-btn:focus-visible { opacity: 1; }
+.only-btn:hover { background: var(--accent-soft); }
+@media (hover: none) { .only-btn { opacity: 1; } }
+@media (max-width: 640px) {
+  /* Auf dem Handy als Blatt am unteren Rand, damit nichts über den Rand ragt */
+  .menu.area-menu {
+    position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto; z-index: 45;
+  }
+  .area-menu-list { max-height: 60vh; }
+}
+
 /* ---------- Listen ---------- */
 .group { margin-top: 18px; }
 .group-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted); padding: 0 4px 6px; }
@@ -518,6 +551,184 @@ kbd {
   font-family: var(--mono); font-size: 12px; color: var(--ink); padding: 0 6px; border-radius: 4px;
   border: 1px solid var(--line-strong); border-bottom-width: 2px; background: var(--surface-2);
 }
+
+/* Auswahl des Designs */
+.panel-sub { margin: 18px 0 8px; font-size: 13.5px; font-weight: 600; }
+.design-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.design-card {
+  display: grid; gap: 4px; text-align: left; padding: 10px; border-radius: var(--r-m);
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+}
+.design-card:hover { border-color: var(--line-strong); }
+.design-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.design-preview { display: flex; height: 64px; border-radius: 8px; overflow: hidden; margin-bottom: 4px; border: 1px solid var(--line); }
+.design-preview i { display: block; }
+.dp-side { width: 30%; }
+.dp-main { flex: 1; padding: 8px; display: grid; gap: 5px; align-content: start; }
+.dp-main b { display: block; height: 10px; border-radius: 3px; }
+.dp-main b:first-child { width: 55%; height: 8px; }
+.dp-standard .dp-side { background: #F5F7FA; border-right: 1px solid #DADFE7; }
+.dp-standard .dp-main { background: #ECEFF3; }
+.dp-standard .dp-main b { background: #FFFFFF; border: 1px solid #DADFE7; }
+.dp-standard .dp-main b:first-child { background: #2C5AD6; border: 0; }
+.dp-papier .dp-side { background: #F8F4EC; border-right: 1px solid #E3DCCF; }
+.dp-papier .dp-main { background: #F3EFE7; }
+.dp-papier .dp-main b { background: #FFFDF9; border-radius: 6px; box-shadow: 0 1px 2px rgb(60 40 20 / 12%); }
+.dp-papier .dp-main b:first-child { background: #B5532C; }
+.dp-fokus .dp-side { background: #14141C; }
+.dp-fokus .dp-main { background: #F6F6F9; }
+.dp-fokus .dp-main b { background: #FFFFFF; border: 1px solid #E4E4EC; border-radius: 2px; }
+.dp-fokus .dp-main b:first-child { background: #6246EA; border: 0; }
+
+/* =====================================================================
+   Design „Papier“: warm, ruhig, Serifen in Überschriften, runde Ecken
+   ===================================================================== */
+:root[data-design="papier"] {
+  --bg: #F3EFE7;
+  --surface: #FFFDF9;
+  --surface-2: #F8F4EC;
+  --sunken: #EAE4D8;
+  --ink: #2A251F;
+  --muted: #6F665A;
+  --faint: #A0968A;
+  --line: #E3DCCF;
+  --line-strong: #CFC6B6;
+  --accent: #B5532C;
+  --accent-hover: #964322;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F6E3D8;
+  --danger: #B83A2E;
+  --danger-soft: #F7E2DC;
+  --warn: #A8670E;
+  --ok: #4B7F3A;
+  --star: #D49A1A;
+  --r-s: 8px;
+  --r-m: 12px;
+  --r-l: 18px;
+  --shadow: 0 1px 2px rgb(60 40 20 / 8%), 0 14px 36px rgb(60 40 20 / 14%);
+  --display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+}
+:root[data-design="papier"][data-theme="dark"] {
+  --bg: #1B1814;
+  --surface: #24201B;
+  --surface-2: #201C18;
+  --sunken: #15120F;
+  --ink: #EDE6DA;
+  --muted: #ADA292;
+  --faint: #7A7062;
+  --line: #352F28;
+  --line-strong: #463F36;
+  --accent: #E59066;
+  --accent-hover: #F0A77F;
+  --accent-ink: #1B1410;
+  --accent-soft: #3A271D;
+  --danger: #EE8676;
+  --danger-soft: #3B231F;
+  --warn: #E2B062;
+  --ok: #8CC27A;
+  --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 14px 40px rgb(0 0 0 / 45%);
+}
+[data-design="papier"] .page-head h1,
+[data-design="papier"] .brief-title,
+[data-design="papier"] .view-title,
+[data-design="papier"] .brand,
+[data-design="papier"] .panel h2,
+[data-design="papier"] .detail-title { font-family: var(--display); letter-spacing: 0; }
+[data-design="papier"] .page-head h1, [data-design="papier"] .brief-title { font-size: 28px; font-weight: 400; }
+[data-design="papier"] .view-title { font-weight: 400; font-size: 16px; }
+[data-design="papier"] .brand-mark { background: var(--accent); }
+[data-design="papier"] .topbar { border-bottom-color: transparent; }
+[data-design="papier"] .sidebar { border-right-color: transparent; }
+[data-design="papier"] .rows { border-color: transparent; box-shadow: 0 1px 2px rgb(60 40 20 / 7%), 0 4px 14px rgb(60 40 20 / 5%); }
+[data-design="papier"] .col { background: color-mix(in srgb, var(--sunken) 70%, var(--bg)); padding: 10px; }
+[data-design="papier"] .col-head { font-family: var(--display); font-weight: 400; font-size: 15px; }
+[data-design="papier"] .task-card { border-color: transparent; box-shadow: 0 1px 2px rgb(60 40 20 / 10%); padding: 11px 8px 11px 12px; }
+[data-design="papier"] .task-card:hover { box-shadow: 0 2px 10px rgb(60 40 20 / 14%); }
+[data-design="papier"] .task-card.selected { box-shadow: 0 0 0 2px var(--accent); }
+[data-design="papier"] .quick { border-color: transparent; box-shadow: 0 1px 2px rgb(60 40 20 / 8%); }
+[data-design="papier"] .prio.p1 { background: #B83A2E; }
+[data-design="papier"] .prio.p2 { background: #C27A1A; }
+[data-design="papier"][data-theme="dark"] .rows,
+[data-design="papier"][data-theme="dark"] .task-card,
+[data-design="papier"][data-theme="dark"] .quick { box-shadow: 0 1px 2px rgb(0 0 0 / 35%); }
+
+/* =====================================================================
+   Design „Fokus“: kontrastreich, dunkle Seitenleiste, violette Akzente
+   ===================================================================== */
+:root[data-design="fokus"] {
+  --bg: #F6F6F9;
+  --surface: #FFFFFF;
+  --surface-2: #FAFAFC;
+  --sunken: #EEEEF3;
+  --ink: #121218;
+  --muted: #5C5D6E;
+  --faint: #9293A3;
+  --line: #E4E4EC;
+  --line-strong: #CDCDD9;
+  --accent: #6246EA;
+  --accent-hover: #4F35D2;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #ECE8FE;
+  --danger: #D1343A;
+  --danger-soft: #FCE6E7;
+  --warn: #B86A00;
+  --ok: #15895A;
+  --star: #F0A500;
+  --r-s: 4px;
+  --r-m: 6px;
+  --r-l: 10px;
+  --shadow: 0 1px 2px rgb(18 18 24 / 8%), 0 16px 40px rgb(18 18 24 / 16%);
+}
+:root[data-design="fokus"][data-theme="dark"] {
+  --bg: #0D0D12;
+  --surface: #16161D;
+  --surface-2: #121218;
+  --sunken: #0A0A0E;
+  --ink: #ECECF3;
+  --muted: #9C9CB0;
+  --faint: #66667A;
+  --line: #24242E;
+  --line-strong: #34343F;
+  --accent: #9D8BFF;
+  --accent-hover: #B5A7FF;
+  --accent-ink: #120E26;
+  --accent-soft: #251F45;
+  --danger: #FF7A7F;
+  --danger-soft: #3A1F24;
+  --warn: #F2B64F;
+  --ok: #4FD196;
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 16px 44px rgb(0 0 0 / 55%);
+}
+/* Seitenleiste bleibt in beiden Modi dunkel */
+[data-design="fokus"] .sidebar {
+  --surface-2: #14141C;
+  --surface: #1E1E28;
+  --sunken: #262632;
+  --ink: #E9E9F1;
+  --muted: #9A9AAE;
+  --faint: #6A6A7E;
+  --line: #2A2A36;
+  --line-strong: #3A3A48;
+  --accent: #B3A4FF;
+  --accent-soft: #2E2858;
+  color: var(--ink);
+  color-scheme: dark;
+  border-right-color: #14141C;
+}
+[data-design="fokus"][data-theme="dark"] .sidebar { --surface-2: #08080B; --surface: #14141B; --sunken: #1B1B24; border-right-color: var(--line); }
+[data-design="fokus"] .nav-item.active { background: var(--accent); color: #120E26; }
+[data-design="fokus"] .nav-item.active .ico, [data-design="fokus"] .nav-item.active .count { color: #120E26; }
+[data-design="fokus"] .brand-mark { background: #6246EA; }
+[data-design="fokus"] .page-head h1, [data-design="fokus"] .brief-title { font-size: 28px; letter-spacing: -0.025em; }
+[data-design="fokus"] .topbar { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+[data-design="fokus"] .col { background: transparent; border: 1px solid var(--line); padding: 6px; }
+[data-design="fokus"] .col-head { text-transform: uppercase; font-size: 11.5px; letter-spacing: 0.06em; color: var(--muted); }
+[data-design="fokus"] .task-card { margin-bottom: 6px; box-shadow: 0 1px 0 var(--line); }
+[data-design="fokus"] .task-card:hover { border-color: var(--accent); }
+[data-design="fokus"] .group-head { text-transform: uppercase; font-size: 11.5px; letter-spacing: 0.06em; }
+[data-design="fokus"] .quick { border-width: 1.5px; }
+[data-design="fokus"] .btn.primary { box-shadow: 0 1px 0 rgb(0 0 0 / 15%), inset 0 1px 0 rgb(255 255 255 / 15%); }
+[data-design="fokus"] .prio.p3 { color: var(--accent); }
 
 /* ---------- Breiten ---------- */
 @media (min-width: 901px) {

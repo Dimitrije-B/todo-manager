@@ -38,7 +38,9 @@
     pin: 'M9 4h6l-1 6 3 3H7l3-3zM12 13v7',
     back: 'M15 6l-6 6 6 6',
     download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
-    upload: 'M12 16V5M7 10l5-5 5 5M5 20h14'
+    upload: 'M12 16V5M7 10l5-5 5 5M5 20h14',
+    moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+    filter: 'M4 5h16l-6 7.5V19l-4 1.5v-8z'
   };
   const Icon = {
     props: { name: String, size: { type: [Number, String], default: 16 } },
@@ -63,6 +65,10 @@
   try { saved = JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {}; } catch (e) { saved = {}; }
   let savedTheme = 'system';
   try { savedTheme = localStorage.getItem('tm_theme') || 'system'; } catch (e) { /* egal */ }
+  const DESIGNS = ['standard', 'papier', 'fokus'];
+  let savedDesign = 'standard';
+  try { savedDesign = localStorage.getItem('tm_design') || 'standard'; } catch (e) { /* egal */ }
+  if (!DESIGNS.includes(savedDesign)) savedDesign = 'standard';
 
   const ui = reactive({
     view: saved.view || 'today',
@@ -72,12 +78,14 @@
     groupBy: saved.groupBy || 'status',
     includeSub: saved.includeSub !== false,
     showClosed: !!saved.showClosed,
+    areaFilter: Array.isArray(saved.areaFilter) ? saved.areaFilter.filter(id => S.area(id)) : [],
     prio: 0,
     tag: '',
     search: '',
     sidebarOpen: false,
     collapsed: saved.collapsed || {},
     theme: savedTheme,
+    design: savedDesign,
     menu: null,
     prompt: null,
     areaDialog: null,
@@ -86,19 +94,29 @@
   if (ui.view === 'area' && !S.area(ui.areaId)) { ui.view = 'today'; ui.areaId = null; }
   if (!['today', 'area', 'open', 'flagged', 'trash', 'settings'].includes(ui.view)) ui.view = 'today';
 
-  watch(() => JSON.stringify([ui.view, ui.areaId, ui.layout, ui.groupBy, ui.includeSub, ui.showClosed, ui.collapsed]), () => {
+  watch(() => JSON.stringify([ui.view, ui.areaId, ui.layout, ui.groupBy, ui.includeSub, ui.showClosed, ui.areaFilter, ui.collapsed]), () => {
     if (ui.view === 'search') return;
     try {
-      localStorage.setItem(UI_KEY, JSON.stringify({ view: ui.view, areaId: ui.areaId, layout: ui.layout, groupBy: ui.groupBy, includeSub: ui.includeSub, showClosed: ui.showClosed, collapsed: ui.collapsed }));
+      localStorage.setItem(UI_KEY, JSON.stringify({ view: ui.view, areaId: ui.areaId, layout: ui.layout, groupBy: ui.groupBy, includeSub: ui.includeSub, showClosed: ui.showClosed, areaFilter: ui.areaFilter, collapsed: ui.collapsed }));
     } catch (e) { /* egal */ }
   });
 
   const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+  const isDark = ref(false);
   function applyTheme() {
     const dark = ui.theme === 'dark' || (ui.theme === 'system' && darkQuery.matches);
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    isDark.value = dark;
+    const root = document.documentElement;
+    root.dataset.theme = dark ? 'dark' : 'light';
+    root.dataset.design = ui.design;
+    /* Browserleiste auf dem Handy an den Hintergrund anpassen */
+    const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+    if (bg) document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bg));
   }
+  /* Schnellschalter: wechselt zwischen Hell und Dunkel, unabhängig vom System */
+  function toggleDark() { ui.theme = isDark.value ? 'light' : 'dark'; }
   watch(() => ui.theme, v => { try { localStorage.setItem('tm_theme', v); } catch (e) { /* egal */ } applyTheme(); });
+  watch(() => ui.design, v => { try { localStorage.setItem('tm_design', v); } catch (e) { /* egal */ } applyTheme(); });
   if (darkQuery.addEventListener) darkQuery.addEventListener('change', applyTheme);
   applyTheme();
 
@@ -382,10 +400,73 @@
 </div>`
   };
 
+  /* Bereichsfilter für „Alle offenen“: ein gewählter Bereich schließt seine Unterbereiche ein */
+  const AreaFilter = {
+    computed: {
+      open() { return ui.menu === 'areas'; },
+      tree() { return S.areaTree(false); },
+      selected() { return new Set(ui.areaFilter); },
+      /* Bereiche, die schon über einen gewählten übergeordneten Bereich enthalten sind */
+      implied() {
+        const out = new Set();
+        ui.areaFilter.forEach(id => S.descendants(id).forEach(d => out.add(d)));
+        return out;
+      },
+      label() {
+        const n = ui.areaFilter.length;
+        if (!n) return 'alle';
+        if (n === 1) return S.pathLabel(ui.areaFilter[0]);
+        return n + ' gewählt';
+      }
+    },
+    methods: {
+      count(id) { return (areaStats.value[id] || {}).open || 0; },
+      toggle(id) {
+        if (this.implied.has(id)) return;
+        if (this.selected.has(id)) ui.areaFilter = ui.areaFilter.filter(x => x !== id);
+        else {
+          /* Unterbereiche, die jetzt ohnehin enthalten sind, aus der Auswahl nehmen */
+          const sub = new Set(S.descendants(id));
+          ui.areaFilter = ui.areaFilter.filter(x => !sub.has(x)).concat(id);
+        }
+      },
+      only(id) { ui.areaFilter = [id]; ui.menu = null; },
+      reset() { ui.areaFilter = []; ui.menu = null; }
+    },
+    template: `
+<div class="menu-anchor area-filter">
+  <button :class="['filter-btn', { on: ui.areaFilter.length }]" @click.stop="ui.menu = open ? null : 'areas'" :aria-expanded="String(open)" aria-haspopup="true">
+    <icon name="filter" :size="14"/>Bereiche: <strong class="ellipsis">{{ label }}</strong><icon name="chev-down" :size="14"/>
+  </button>
+  <button v-if="ui.areaFilter.length" class="chip-x" @click.stop="reset" title="Filter zurücksetzen" aria-label="Bereichsfilter zurücksetzen"><icon name="x" :size="12"/></button>
+  <div v-if="open" class="menu area-menu" @click.stop role="dialog" aria-label="Bereiche filtern">
+    <div class="area-menu-head">
+      <span class="menu-label">Nur diese Bereiche zeigen</span>
+      <button class="btn ghost sm" :disabled="!ui.areaFilter.length" @click="reset">Alle zeigen</button>
+    </div>
+    <div class="area-menu-list">
+      <div v-for="a in tree" :key="a.id" :class="['area-opt', { implied: implied.has(a.id) }]" :style="{ paddingLeft: (8 + a.depth * 16) + 'px' }">
+        <label>
+          <input type="checkbox" :checked="selected.has(a.id) || implied.has(a.id)" :disabled="implied.has(a.id)" @change="toggle(a.id)">
+          <span class="area-dot" :style="{ background: a.area.color || 'var(--line-strong)' }"></span>
+          <span class="ellipsis">{{ a.name }}</span>
+          <span class="count">{{ count(a.id) || '' }}</span>
+        </label>
+        <button class="only-btn" @click="only(a.id)" :title="'Nur ' + a.name" :aria-label="'Nur ' + a.name + ' zeigen'">nur</button>
+      </div>
+    </div>
+  </div>
+</div>`
+  };
+
   const QuickAdd = {
     data() { return { text: '', focus: false }; },
     computed: {
-      defaultArea() { return ui.view === 'area' && S.area(ui.areaId) ? ui.areaId : 'inbox'; },
+      defaultArea() {
+        if (ui.view === 'area' && S.area(ui.areaId)) return ui.areaId;
+        if (ui.view === 'open' && ui.areaFilter.length === 1 && S.area(ui.areaFilter[0])) return ui.areaFilter[0];
+        return 'inbox';
+      },
       parsed() { return this.text.trim() ? U.parseQuick(this.text, S.findArea) : null; },
       targetArea() { return (this.parsed && this.parsed.areaId) || this.defaultArea; },
       targetColor() { return (S.area(this.targetArea) || {}).color || 'var(--faint)'; },
@@ -948,7 +1029,14 @@
       session() { return S.meta.session; },
       dirty() { return S.dirtyCount(); },
       settings() { return S.settings(); },
-      themes() { return [{ id: 'system', label: 'Wie System' }, { id: 'light', label: 'Hell' }, { id: 'dark', label: 'Dunkel' }]; }
+      themes() { return [{ id: 'system', label: 'Wie System' }, { id: 'light', label: 'Hell' }, { id: 'dark', label: 'Dunkel' }]; },
+      designs() {
+        return [
+          { id: 'standard', label: 'Standard', desc: 'Kühl und sachlich, blaue Akzente' },
+          { id: 'papier', label: 'Papier', desc: 'Warm und ruhig, Serifen-Überschriften, runde Ecken' },
+          { id: 'fokus', label: 'Fokus', desc: 'Kontrastreich, dunkle Seitenleiste, violette Akzente' }
+        ];
+      }
     },
     methods: {
       async auth(mode) {
@@ -1092,7 +1180,16 @@
 
   <section class="panel">
     <h2>Darstellung</h2>
+    <p class="hint">Hell und Dunkel lassen sich auch oben rechts über Sonne und Mond umschalten.</p>
     <div class="seg" role="group" aria-label="Farbschema"><button v-for="o in themes" :key="o.id" :class="{ on: ui.theme === o.id }" @click="ui.theme = o.id">{{ o.label }}</button></div>
+    <h3 class="panel-sub">Design</h3>
+    <div class="design-grid" role="radiogroup" aria-label="Design">
+      <button v-for="d in designs" :key="d.id" :class="['design-card', { on: ui.design === d.id }]" role="radio" :aria-checked="String(ui.design === d.id)" @click="ui.design = d.id">
+        <span :class="['design-preview', 'dp-' + d.id]" aria-hidden="true"><i class="dp-side"></i><i class="dp-main"><b></b><b></b><b></b></i></span>
+        <strong>{{ d.label }}</strong>
+        <span class="muted small">{{ d.desc }}</span>
+      </button>
+    </div>
   </section>
 
   <section v-if="archived.length" class="panel">
@@ -1135,7 +1232,14 @@
           const archived = S.isAreaArchived(currentArea.value.id);
           const ids = new Set([ui.areaId].concat(ui.includeSub ? S.descendants(ui.areaId) : []));
           list = (archived ? S.taskList() : activeTasks.value).filter(t => ids.has(t.areaId) && !t.parentId);
-        } else if (ui.view === 'open') list = activeTasks.value.filter(t => !t.parentId);
+        } else if (ui.view === 'open') {
+          list = activeTasks.value.filter(t => !t.parentId);
+          if (ui.areaFilter.length) {
+            const ids = new Set();
+            ui.areaFilter.forEach(id => { ids.add(id); S.descendants(id).forEach(d => ids.add(d)); });
+            list = list.filter(t => ids.has(t.areaId));
+          }
+        }
         else if (ui.view === 'flagged') list = activeTasks.value.filter(t => t.flagged);
         if (!ui.showClosed) list = list.filter(t => !S.isClosed(t));
         if (ui.prio) list = list.filter(t => t.priority === ui.prio);
@@ -1167,7 +1271,7 @@
         }
       });
       const emptyText = computed(() => {
-        if (ui.prio || ui.tag) return 'Kein Treffer für diesen Filter.';
+        if (ui.prio || ui.tag || (ui.view === 'open' && ui.areaFilter.length)) return 'Kein Treffer für diesen Filter.';
         if (ui.view === 'flagged') return 'Nichts markiert. Der Stern an einer Aufgabe hebt sie hier hervor.';
         if (ui.view === 'open') return 'Keine offenen Aufgaben.';
         if (ui.areaId === 'inbox') return 'Der Eingang ist leer. Neue Aufgaben ohne Bereich landen hier.';
@@ -1206,7 +1310,7 @@
       function drop(areaId) { dropTarget.value = null; onDropArea(areaId); }
 
       return {
-        ui, S, Y, counts, dropTarget, selectedTask, currentArea, rootAreas, listLike, hasSubareas, showQuick,
+        ui, S, Y, counts, isDark, dropTarget, selectedTask, currentArea, rootAreas, listLike, hasSubareas, showQuick,
         showAreaInRows, tags, scopeTasks, title, pageHead, emptyText, syncLabel, syncColor,
         onSearch, clearSearch, newArea, example, runToast, onRootOver, onInboxOver, drop
       };
@@ -1252,6 +1356,7 @@
         <button :class="{ on: ui.layout === 'list' }" @click="ui.layout = 'list'" title="Liste" :aria-pressed="String(ui.layout === 'list')"><icon name="list" :size="15"/><span class="hide-sm">Liste</span></button>
         <button :class="{ on: ui.layout === 'board' }" @click="ui.layout = 'board'" title="Kanban" :aria-pressed="String(ui.layout === 'board')"><icon name="board" :size="15"/><span class="hide-sm">Kanban</span></button>
       </div>
+      <button class="icon-btn theme-btn" @click.stop="toggleDark" :title="isDark ? 'Hellen Modus einschalten' : 'Dunklen Modus einschalten'" :aria-label="isDark ? 'Hellen Modus einschalten' : 'Dunklen Modus einschalten'"><icon :name="isDark ? 'sun' : 'moon'"/></button>
     </header>
     <div :class="['content', { wide: listLike && ui.layout === 'board' }]">
       <area-brief v-if="ui.view === 'area' && currentArea" :area="currentArea"/>
@@ -1262,6 +1367,7 @@
           <select class="select-sm" v-model="ui.groupBy"><option value="status">nach Status</option><option value="area">nach Bereich</option><option value="none">nicht</option></select>
         </label>
         <label v-if="ui.view === 'area' && hasSubareas" class="toggle"><input type="checkbox" v-model="ui.includeSub">Unterbereiche einbeziehen</label>
+        <area-filter v-if="ui.view === 'open'"/>
         <label class="toggle"><input type="checkbox" v-model="ui.showClosed">Abgeschlossene zeigen</label>
         <label class="toolbar-field">Priorität
           <select class="select-sm" v-model.number="ui.prio"><option :value="0">alle</option><option v-for="p in [1, 2, 3, 4]" :key="p" :value="p">P{{ p }}</option></select>
@@ -1377,7 +1483,7 @@
 
   /* ---------- Start ---------- */
   const app = createApp(App);
-  Object.assign(app.config.globalProperties, { S, U, Y, ui, go, toggleDone, requestStatus, endDrag, selectTask });
+  Object.assign(app.config.globalProperties, { S, U, Y, ui, go, toggleDone, requestStatus, endDrag, selectTask, toggleDark });
   app.directive('autosize', autosize);
   app.component('icon', Icon);
   app.component('tree-node', TreeNode);
@@ -1385,6 +1491,7 @@
   app.component('task-list', TaskList);
   app.component('board-view', BoardView);
   app.component('quick-add', QuickAdd);
+  app.component('area-filter', AreaFilter);
   app.component('links-editor', LinksEditor);
   app.component('notes-editor', NotesEditor);
   app.component('area-brief', AreaBrief);
